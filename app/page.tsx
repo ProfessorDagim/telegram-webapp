@@ -1,10 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Bot, Sparkles, Zap, Shield, Brain, Cpu, Power } from "lucide-react"
 
 export default function Component() {
+  const router = useRouter()
   const [isStarted, setIsStarted] = useState(false)
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [showWelcome, setShowWelcome] = useState(false)
@@ -22,6 +24,10 @@ export default function Component() {
       setLoadingProgress((prev) => {
         if (prev >= 100) {
           clearInterval(interval)
+          // Navigate to chat page after initialization completes
+          setTimeout(() => {
+            router.push('/chat')
+          }, 1000) // Wait 1 second after 100% to show completion
           return 100
         }
         return prev + Math.random() * 15
@@ -281,6 +287,9 @@ export default function Component() {
               <p className="text-2xl text-white font-semibold animate-pulse">Initializing DE OMNI</p>
               <p className="text-blue-400 text-sm">Neural networks coming online...</p>
               <p className="text-cyan-400 text-xs">{Math.round(loadingProgress)}% Complete</p>
+              {loadingProgress >= 100 && (
+                <p className="text-green-400 text-sm font-medium">Initialization Complete! Redirecting...</p>
+              )}
             </div>
           </div>
         </div>
