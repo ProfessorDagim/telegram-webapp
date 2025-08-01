@@ -1,7 +1,8 @@
-// app/layout.tsx
+import './globals.css'
+
 export const metadata = {
-  title: 'Telegram Web App',
-  description: 'Chat with the AI assistant',
+  title: 'DE OMNI - Advanced AI Assistant',
+  description: 'Advanced AI • Infinite Possibilities • Your Digital Companion',
 };
 
 export default function RootLayout({
@@ -12,9 +13,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <main style={{ maxWidth: '600px', margin: '0 auto' }}>
-          {children}
-        </main>
+        {children}
       </body>
     </html>
   );
