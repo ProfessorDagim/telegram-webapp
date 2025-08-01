@@ -1,13 +1,86 @@
-/* app/globals.css */
-* {
+body {
+  background-color: #0a0a23;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+  overflow: hidden;
 }
 
-body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #f5f5f5;
-  color: #333;
-  padding: 1rem;
+.welcome-screen {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  position: relative;
+  background: radial-gradient(circle at center, #0a0a23, #000000);
+  z-index: 0;
+}
+
+.glowing-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 4px solid rgba(0, 153, 255, 0.3);
+  border-radius: 24px;
+  box-shadow: 0 0 30px rgba(0, 153, 255, 0.6);
+  animation: pulse-border 4s ease-in-out infinite;
+  z-index: 1;
+}
+
+@keyframes pulse-border {
+  0%, 100% {
+    box-shadow: 0 0 30px rgba(0, 153, 255, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 60px rgba(0, 153, 255, 1);
+  }
+}
+
+.glowing-logo {
+  animation: rotate-light 6s linear infinite;
+  box-shadow: 0 0 25px rgba(0, 255, 255, 0.6);
+}
+
+@keyframes rotate-light {
+  0% {
+    box-shadow: 0 0 25px rgba(0, 255, 255, 0.6);
+    transform: rotate(0deg);
+  }
+  100% {
+    box-shadow: 0 0 35px rgba(0, 255, 255, 1);
+    transform: rotate(360deg);
+  }
+}
+
+.start-button {
+  background: linear-gradient(135deg, #00c6ff, #0072ff);
+  border: none;
+  padding: 15px 40px;
+  font-size: 1.25rem;
+  color: white;
+  font-weight: bold;
+  border-radius: 40px;
+  cursor: pointer;
+  box-shadow: 0 0 25px rgba(0, 153, 255, 0.4);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.start-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 45px rgba(0, 153, 255, 0.8);
+}
+
+.animate-fade-in {
+  animation: fadeIn 2s ease forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
