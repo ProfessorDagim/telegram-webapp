@@ -38,17 +38,29 @@ export default function ChatPage() {
     setInputMessage('')
     setIsTyping(true)
 
-    // Simulate AI response (we'll integrate real AI later)
-    setTimeout(() => {
+    try {
+      const res = await fetch('http://localhost:8000/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: inputMessage })
+      })
+      const data = await res.json()
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: 'I understand your message. This is a placeholder response - we will integrate the real AI functionality soon!',
+        text: data.response,
         sender: 'ai',
         timestamp: new Date()
       }
       setMessages(prev => [...prev, aiMessage])
-      setIsTyping(false)
-    }, 1500)
+    } catch (error) {
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 2).toString(),
+        text: '⚠️ Error contacting AI backend.',
+        sender: 'ai',
+        timestamp: new Date()
+      }])
+    }
+    setIsTyping(false)
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
