@@ -24,6 +24,10 @@ export default function ChatPage() {
   const [inputMessage, setInputMessage] = useState('')
   const [isTyping, setIsTyping] = useState(false)
 
+  // Set your backend URL here
+  const BACKEND_URL = "https://c72d78f6c330.ngrok-free.app";
+  // For local development, you can use: "http://localhost:8000"
+
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return
 
@@ -39,7 +43,7 @@ export default function ChatPage() {
     setIsTyping(true)
 
     try {
-      const res = await fetch('http://localhost:8000/chat', {
+      const res = await fetch(`${BACKEND_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: inputMessage })
