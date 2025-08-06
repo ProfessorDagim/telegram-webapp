@@ -1,23 +1,21 @@
-// // app/layout.tsx
-// import './globals.css';
+import './globals.css';
+import type { Metadata } from 'next'
 
-// export const metadata = {
-//   title: 'Telegram Web App',
-//   description: 'Chat with the AI assistant',
-// };
+export const metadata: Metadata = {
+  title: 'DE OMNI - AI Assistant',
+  description: 'Advanced AI-powered chat interface',
+};
 
-// export default function RootLayout({
-//   children,
-// }: {
-//   children: React.ReactNode;
-// }) {
-//   return (
-//     <html lang="en">
-//       <body>
-//         <main style={{ maxWidth: '600px', margin: '0 auto' }}>
-//           {children}
-//         </main>
-//       </body>
-//     </html>
-//   );
-// }
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>
+        {children}
+      </body>
+    </html>
+  );
+}

@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DE OMNI Frontend
 
-## Getting Started
+This is the frontend application for DE OMNI, an AI-powered chat interface that connects to the FastAPI backend.
 
-First, run the development server:
+## Features
 
+- 🎨 Modern, sci-fi inspired UI with animations
+- 💬 Real-time chat interface
+- 🤖 AI-powered responses via DeepSeek API
+- 📱 Responsive design
+- 🔗 Backend connectivity status indicator
+
+## Prerequisites
+
+- Node.js 18+ 
+- npm or yarn
+- Backend server running (see main README.md)
+
+## Installation
+
+1. Install dependencies:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Configure the backend URL:
+   - Edit `config.ts` and update the `backendUrl` to point to your backend server
+   - Default is `http://localhost:8000`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Development
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Start the development server:
+```bash
+npm run dev
+```
 
-## Learn More
+The application will be available at `http://localhost:3000`
 
-To learn more about Next.js, take a look at the following resources:
+## Production
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Build the application:
+```bash
+npm run build
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Start the production server:
+```bash
+npm start
+```
 
-## Deploy on Vercel
+## Backend Connection
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The frontend connects to the backend via the `/chat` endpoint. Make sure:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. The backend server is running
+2. CORS is properly configured (already done in the backend)
+3. The backend URL in `config.ts` is correct
+
+## Environment Variables
+
+You can set the backend URL using environment variables:
+
+```bash
+NEXT_PUBLIC_BACKEND_URL=http://your-backend-url:8000
+```
+
+## Project Structure
+
+```
+telegram-webapp/
+├── app/
+│   ├── chat/          # Chat interface
+│   ├── page.tsx       # Landing page
+│   └── layout.tsx     # Root layout
+├── components/        # UI components
+├── lib/
+│   └── api.ts        # API service
+├── config.ts         # Configuration
+└── package.json
+```
+
+## Troubleshooting
+
+### Connection Issues
+- Check if the backend server is running
+- Verify the backend URL in `config.ts`
+- Check browser console for CORS errors
+- Ensure the backend has the correct CORS origins configured
+
+### Build Issues
+- Clear `.next` folder and rebuild
+- Check Node.js version compatibility
+- Verify all dependencies are installed
