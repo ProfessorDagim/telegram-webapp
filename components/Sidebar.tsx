@@ -102,7 +102,7 @@ export default function Sidebar({ isOpen, onClose, onNewChat, onThreadSelect, cu
             </Button>
           </div>
           {loading && <p className="text-gray-300">Loading...</p>}
-          {!loading && threads.length === 0 && <p className="text-gray-500 text-sm">No threads available</p>}
+          {!loading && threads.length === 0 && <p className="text-gray-500 text-sm">🚀🤖 Coming Soon </p>}
           <ul>
             {threads.map((thread, idx) => (
               <li
