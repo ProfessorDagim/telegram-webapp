@@ -1,4 +1,4 @@
-import { config } from "@/config"
+import { appSettings } from "@/lib/app-settings"
 
 export interface ChatRequest {
   message: string
@@ -41,14 +41,11 @@ export class ApiService {
   private baseUrl: string
 
   constructor() {
-    this.baseUrl = config.backendUrl
+    this.baseUrl = appSettings.backendUrl
   }
 
   async sendMessage(request: ChatRequest): Promise<ChatResponse> {
-    console.log('API Service: Sending request to', `${this.baseUrl}${config.endpoints.chat}`)
-    console.log('API Service: Request body', request)
-    
-    const response = await fetch(`${this.baseUrl}${config.endpoints.chat}`, {
+          const response = await fetch(`${this.baseUrl}${appSettings.endpoints.chat}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -56,24 +53,16 @@ export class ApiService {
       body: JSON.stringify(request),
     })
 
-    console.log('API Service: Response status', response.status)
-    console.log('API Service: Response headers', response.headers)
-
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error('API Service: Error response', errorText)
       throw new Error(`HTTP error! status: ${response.status}`)
     }
 
-    const data = await response.json()
-    console.log('API Service: Response data', data)
-    return data
+    return response.json()
   }
 
   async healthCheck(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/health`)
-      // Accept both JSON and HTML responses as valid
+      const response = await fetch(`${this.baseUrl}${appSettings.endpoints.health}`)
       return response.ok
     } catch (error) {
       console.error("Health check failed:", error)
@@ -82,29 +71,27 @@ export class ApiService {
   }
 
   async getUserThreads(userId: number = 1): Promise<ThreadsResponse | { error: string }> {
-    console.log('API Service: Getting threads for user', userId)
     try {
-      const response = await fetch(`${this.baseUrl}/threads/${userId}`)
-      console.log('API Service: Threads response status', response.status)
-      const text = await response.text()
-      try {
-        const data = JSON.parse(text)
-        if (response.ok && data.threads) {
-          console.log('API Service: Threads data', data)
-          return data
-        } else if (data.error) {
-          console.error('API Service: Threads error', data.error)
-          return { error: data.error }
-        } else {
-          console.error('API Service: Unexpected response', data)
-          return { error: 'Unexpected response from server.' }
-        }
-      } catch (jsonErr) {
-        console.error('API Service: Failed to parse JSON', jsonErr, text)
-        return { error: 'Invalid response from server.' }
+      const response = await fetch(`${this.baseUrl}${appSettings.endpoints.threads}/${userId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      if (!response.ok) {
+        return { error: `HTTP error! status: ${response.status}` }
+      }
+      
+      const data = await response.json()
+      
+      if (data.threads) {
+        return data
+      } else {
+        return { error: 'Unexpected response format from server.' }
       }
     } catch (error) {
-      console.error('API Service: Network or fetch error', error)
+      console.error('API Service: Network error in getUserThreads', error)
       return { error: 'Network error. Could not fetch threads.' }
     }
   }
@@ -117,23 +104,38 @@ export class ApiService {
       },
       body: JSON.stringify({ user_id: userId, first_message: firstMessage }),
     })
+    
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
+    
     return response.json()
   }
 
   async getThreadMessages(threadId: number): Promise<MessagesResponse> {
-    const response = await fetch(`${this.baseUrl}/threads/${threadId}/messages`)
+    const response = await fetch(`${this.baseUrl}/threads/${threadId}/messages`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+    
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
+    
     return response.json()
   }
 
   async getUserThreadsFormatted(userId: number = 1): Promise<{ threads_formatted: string } | { error: string }> {
     try {
-      const response = await fetch(`${this.baseUrl}/threads_formatted/${userId}`)
+      const response = await fetch(`${this.baseUrl}${appSettings.endpoints.threadsFormatted}/${userId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
       const data = await response.json()
       if (response.ok && data.threads_formatted) {
         return data

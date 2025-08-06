@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Send, Bot, User, ArrowLeft, Loader2, Menu } from "lucide-react"
+import { Send, Bot, User, ArrowLeft, Loader2, Menu, Wifi, WifiOff } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { config } from "@/config"
+import { appSettings } from "@/lib/app-settings"
 import { apiService, ThreadMessage } from "@/lib/api"
 import Sidebar from "@/components/Sidebar"
 
@@ -26,17 +26,28 @@ export default function ChatPage() {
   const [sidebarKey, setSidebarKey] = useState(0) // Force sidebar reload
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [backendUrl, setBackendUrl] = useState("")
+  const [connectionError, setConnectionError] = useState<string | null>(null)
 
   useEffect(() => {
     // Get backend URL from config
-    setBackendUrl(config.backendUrl)
+    setBackendUrl(appSettings.backendUrl)
     
     // Check backend connection
     const checkConnection = async () => {
-      const connected = await apiService.healthCheck()
-      setIsConnected(connected)
+      try {
+        const connected = await apiService.healthCheck()
+        setIsConnected(connected)
+        setConnectionError(null)
+      } catch (error) {
+        setIsConnected(false)
+        setConnectionError("Failed to connect to server")
+      }
     }
+    
     checkConnection()
+    
+    // Set up periodic connection check
+    const interval = setInterval(checkConnection, 30000) // Check every 30 seconds
     
     // Initialize with welcome message
     setMessages([
@@ -47,6 +58,8 @@ export default function ChatPage() {
         timestamp: new Date()
       }
     ])
+    
+    return () => clearInterval(interval)
   }, [])
 
   const handleNewChat = () => {
@@ -60,7 +73,7 @@ export default function ChatPage() {
     ])
     setCurrentThreadId(null)
     // Force sidebar to reload threads when it opens next time
-    setIsSidebarOpen(false)
+    setSidebarKey(prev => prev + 1)
   }
 
   const handleThreadSelect = async (threadId: number) => {
@@ -75,8 +88,18 @@ export default function ChatPage() {
       
       setMessages(threadMessages)
       setCurrentThreadId(threadId)
+      setIsSidebarOpen(false) // Close sidebar after selection
     } catch (error) {
       console.error("Error loading thread messages:", error)
+      // Show error message
+      setMessages([
+        {
+          id: Date.now().toString(),
+          text: "Sorry, I couldn't load the conversation. Please try again.",
+          sender: "bot",
+          timestamp: new Date()
+        }
+      ])
     }
   }
 
@@ -89,7 +112,7 @@ export default function ChatPage() {
   }, [messages])
 
   const sendMessage = async () => {
-    if (!inputMessage.trim() || isLoading) return
+    if (!inputMessage.trim() || isLoading || !isConnected) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -103,7 +126,7 @@ export default function ChatPage() {
     setIsLoading(true)
 
     try {
-      console.log('Sending message to:', config.backendUrl + config.endpoints.chat)
+      console.log('Sending message to:', appSettings.backendUrl + appSettings.endpoints.chat)
       const data = await apiService.sendMessage({
         message: inputMessage,
         thread_id: currentThreadId // Use current thread ID if available
@@ -128,7 +151,7 @@ export default function ChatPage() {
       console.error("Error sending message:", error)
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: "Sorry, I'm having trouble connecting to the server. Please try again later.",
+        text: "Sorry, I'm having trouble connecting to the server. Please check your connection and try again.",
         sender: "bot",
         timestamp: new Date()
       }
@@ -142,6 +165,17 @@ export default function ChatPage() {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       sendMessage()
+    }
+  }
+
+  const retryConnection = async () => {
+    try {
+      const connected = await apiService.healthCheck()
+      setIsConnected(connected)
+      setConnectionError(null)
+    } catch (error) {
+      setIsConnected(false)
+      setConnectionError("Connection failed")
     }
   }
 
@@ -179,13 +213,51 @@ export default function ChatPage() {
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <div className={`w-2 h-2 rounded-full animate-pulse ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}></div>
-            <span className={`text-xs ${isConnected ? 'text-green-400' : 'text-red-400'}`}>
-              {isConnected ? 'Connected' : 'Disconnected'}
-            </span>
+            <div className="flex items-center space-x-2">
+              {isConnected ? (
+                <Wifi className="w-4 h-4 text-green-400" />
+              ) : (
+                <WifiOff className="w-4 h-4 text-red-400" />
+              )}
+              <span className={`text-xs ${isConnected ? 'text-green-400' : 'text-red-400'}`}>
+                {isConnected ? 'Connected' : 'Disconnected'}
+              </span>
+              {!isConnected && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={retryConnection}
+                  className="text-xs text-blue-400 hover:text-blue-300"
+                >
+                  Retry
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Connection Error Banner */}
+      {connectionError && (
+        <div className="bg-red-900/20 border-b border-red-500/30 p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <WifiOff className="w-4 h-4 text-red-400" />
+              <span className="text-red-400 text-sm">{connectionError}</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={retryConnection}
+              className="text-xs text-blue-400 hover:text-blue-300"
+            >
+              Retry Connection
+            </Button>
+          </div>
+        </div>
+      )}
+
+
 
       {/* Messages Container */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -242,15 +314,16 @@ export default function ChatPage() {
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Type your message..."
-              className="w-full bg-gray-800/50 border border-gray-600 rounded-2xl px-4 py-3 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+              placeholder={isConnected ? "Type your message..." : "Disconnected - cannot send messages"}
+              className="w-full bg-gray-800/50 border border-gray-600 rounded-2xl px-4 py-3 text-white placeholder-gray-400 resize-none focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 disabled:opacity-50"
               rows={1}
               style={{ minHeight: "48px", maxHeight: "120px" }}
+              disabled={!isConnected}
             />
           </div>
           <Button
             onClick={sendMessage}
-            disabled={!inputMessage.trim() || isLoading}
+            disabled={!inputMessage.trim() || isLoading || !isConnected}
             className="bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white rounded-2xl px-4 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Send className="w-4 h-4" />
