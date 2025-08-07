@@ -41,7 +41,7 @@ export class ApiService {
   private baseUrl: string
 
   constructor() {
-    this.baseUrl = appSettings.backendUrl
+    this.baseUrl = appSettings.backendUrl.replace(/\/$/, "") // Ensure no trailing slash
   }
 
   async sendMessage(request: ChatRequest): Promise<ChatResponse> {
