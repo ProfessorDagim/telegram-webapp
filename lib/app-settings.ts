@@ -1,6 +1,6 @@
 export const appSettings = {
   // Backend API URL - change this to your current ngrok URL
-  backendUrl: "https://d62679a97ef2.ngrok-free.app",
+  backendUrl: "https://db37a3b88329.ngrok-free.app",
   // App settings
   appName: "DE OMNI",
   appDescription: "Advanced AI Assistant",
