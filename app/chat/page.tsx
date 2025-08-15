@@ -2,17 +2,21 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Send, Bot, User, ArrowLeft, Loader2, Menu, Wifi, WifiOff } from "lucide-react"
+import { Send, Bot, ArrowLeft, Loader2, Menu, Wifi, WifiOff, CameraIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { appSettings } from "@/lib/app-settings"
 import { apiService, ThreadMessage } from "@/lib/api"
 import Sidebar from "@/components/Sidebar"
+
+import ReactMarkdown from "react-markdown"
+import rehypeHighlight from "rehype-highlight"
 
 interface Message {
   id: string
   text: string
   sender: "user" | "bot"
   timestamp: Date
+  imageUrl?: string
 }
 
 export default function ChatPage() {
@@ -23,33 +27,29 @@ export default function ChatPage() {
   const [isConnected, setIsConnected] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [currentThreadId, setCurrentThreadId] = useState<number | null>(null)
-  const [sidebarKey, setSidebarKey] = useState(0) // Force sidebar reload
+  const [sidebarKey, setSidebarKey] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [backendUrl, setBackendUrl] = useState("")
   const [connectionError, setConnectionError] = useState<string | null>(null)
 
+  // Pending photo states
+  const [pendingPhoto, setPendingPhoto] = useState<File | null>(null)
+  const [pendingPhotoUrl, setPendingPhotoUrl] = useState<string | null>(null)
+
   useEffect(() => {
-    // Get backend URL from config
     setBackendUrl(appSettings.backendUrl)
-    
-    // Check backend connection
     const checkConnection = async () => {
       try {
         const connected = await apiService.healthCheck()
         setIsConnected(connected)
         setConnectionError(null)
-      } catch (error) {
+      } catch {
         setIsConnected(false)
         setConnectionError("Failed to connect to server")
       }
     }
-    
     checkConnection()
-    
-    // Set up periodic connection check
-    const interval = setInterval(checkConnection, 30000) // Check every 30 seconds
-    
-    // Initialize with welcome message
+    const interval = setInterval(checkConnection, 30000)
     setMessages([
       {
         id: "1",
@@ -58,7 +58,6 @@ export default function ChatPage() {
         timestamp: new Date()
       }
     ])
-    
     return () => clearInterval(interval)
   }, [])
 
@@ -72,7 +71,6 @@ export default function ChatPage() {
       }
     ])
     setCurrentThreadId(null)
-    // Force sidebar to reload threads when it opens next time
     setSidebarKey(prev => prev + 1)
   }
 
@@ -85,13 +83,10 @@ export default function ChatPage() {
         sender: msg.sender as "user" | "bot",
         timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
       }))
-      
       setMessages(threadMessages)
       setCurrentThreadId(threadId)
-      setIsSidebarOpen(false) // Close sidebar after selection
-    } catch (error) {
-      console.error("Error loading thread messages:", error)
-      // Show error message
+      setIsSidebarOpen(false)
+    } catch {
       setMessages([
         {
           id: Date.now().toString(),
@@ -106,59 +101,86 @@ export default function ChatPage() {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
-
   useEffect(() => {
     scrollToBottom()
   }, [messages])
 
   const sendMessage = async () => {
-    if (!inputMessage.trim() || isLoading || !isConnected) return
+    if ((!inputMessage.trim() && !pendingPhoto) || isLoading || !isConnected) return
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      text: inputMessage,
-      sender: "user",
-      timestamp: new Date()
+    // Add user message (text)
+    if (inputMessage.trim()) {
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        text: inputMessage,
+        sender: "user",
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, userMessage])
     }
 
-    setMessages(prev => [...prev, userMessage])
-    setInputMessage("")
+    // Add pending photo to chat preview
+    if (pendingPhotoUrl) {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          text: inputMessage || "",
+          sender: "user",
+          timestamp: new Date(),
+          imageUrl: pendingPhotoUrl
+        }
+      ])
+    }
+
     setIsLoading(true)
+    const formData = new FormData()
+    if (pendingPhoto) formData.append("photo", pendingPhoto)
+    formData.append("caption", inputMessage || "")
+    if (currentThreadId) formData.append("thread_id", String(currentThreadId))
+
+    setInputMessage("")
+    setPendingPhoto(null)
+    setPendingPhotoUrl(null)
 
     try {
-      console.log('Sending message to:', appSettings.backendUrl + appSettings.endpoints.chat)
-      const data = await apiService.sendMessage({
-        message: inputMessage,
-        thread_id: currentThreadId // Use current thread ID if available
-      })
-      console.log('Received response:', data)
-      
-      const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: data.response,
-        sender: "bot",
-        timestamp: new Date()
+      let botResponse
+      if (pendingPhoto) {
+        const res = await fetch(`${backendUrl}/webapp_upload`, { method: "POST", body: formData })
+        if (!res.ok) throw new Error(`Upload failed: ${res.statusText}`)
+        botResponse = await res.json()
+      } else {
+        botResponse = await apiService.sendMessage({ message: inputMessage, thread_id: currentThreadId })
       }
 
-      setMessages(prev => [...prev, botMessage])
-      
-      // If this was the first message in a new thread, reload the sidebar threads
-      if (!currentThreadId) {
-        // Force sidebar to reload threads when opened next time
-        setSidebarKey(prev => prev + 1)
-      }
-    } catch (error) {
-      console.error("Error sending message:", error)
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: "Sorry, I'm having trouble connecting to the server. Please check your connection and try again.",
+      const botMessage: Message = {
+        id: (Date.now() + 2).toString(),
+        text: botResponse.response,
         sender: "bot",
         timestamp: new Date()
       }
-      setMessages(prev => [...prev, errorMessage])
+      setMessages(prev => [...prev, botMessage])
+      if (!currentThreadId) setSidebarKey(prev => prev + 1)
+    } catch {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: (Date.now() + 2).toString(),
+          text: "❌ Failed to send message/photo. Please try again.",
+          sender: "bot",
+          timestamp: new Date()
+        }
+      ])
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Photo selection only (no immediate upload)
+  const handlePhotoSelect = (file: File) => {
+    if (!file || !isConnected) return
+    setPendingPhoto(file)
+    setPendingPhotoUrl(URL.createObjectURL(file))
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -173,11 +195,32 @@ export default function ChatPage() {
       const connected = await apiService.healthCheck()
       setIsConnected(connected)
       setConnectionError(null)
-    } catch (error) {
+    } catch {
       setIsConnected(false)
       setConnectionError("Connection failed")
     }
   }
+
+  const renderMarkdown = (text: string) => (
+    <ReactMarkdown rehypePlugins={[rehypeHighlight]}
+      components={{
+        p: ({ children }) => <p className="text-sm">{children}</p>,
+        strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+        em: ({ children }) => <em className="italic">{children}</em>,
+        a: ({ children, href }) => (
+          <a href={href} className="text-blue-400 underline" target="_blank" rel="noreferrer">
+            {children}
+          </a>
+        ),
+        h1: ({ children }) => <h1 className="text-lg font-bold">{children}</h1>,
+        h2: ({ children }) => <h2 className="text-md font-semibold">{children}</h2>,
+        h3: ({ children }) => <h3 className="text-md font-semibold">{children}</h3>,
+        li: ({ children }) => <li className="ml-4 list-disc">{children}</li>
+      }}
+    >
+      {text}
+    </ReactMarkdown>
+  )
 
   return (
     <div className="w-full h-screen bg-black flex flex-col">
@@ -185,21 +228,10 @@ export default function ChatPage() {
       <div className="bg-gradient-to-r from-blue-900/50 to-purple-900/50 backdrop-blur-sm border-b border-blue-400/20 p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push("/")}
-              className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
+            <Button variant="ghost" size="sm" onClick={() => router.push("/")} className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30">
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsSidebarOpen(true)}
-              className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
-            >
+            <Button variant="ghost" size="sm" onClick={() => setIsSidebarOpen(true)} className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30">
               <Menu className="w-4 h-4" />
             </Button>
             <div className="flex items-center space-x-2">
@@ -213,102 +245,96 @@ export default function ChatPage() {
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-2">
-              {isConnected ? (
-                <Wifi className="w-4 h-4 text-green-400" />
-              ) : (
-                <WifiOff className="w-4 h-4 text-red-400" />
-              )}
-              <span className={`text-xs ${isConnected ? 'text-green-400' : 'text-red-400'}`}>
-                {isConnected ? 'Connected' : 'Disconnected'}
-              </span>
-              {!isConnected && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={retryConnection}
-                  className="text-xs text-blue-400 hover:text-blue-300"
-                >
-                  Retry
-                </Button>
-              )}
-            </div>
+            {isConnected ? <Wifi className="w-4 h-4 text-green-400" /> : <WifiOff className="w-4 h-4 text-red-400" />}
+            <span className={`text-xs ${isConnected ? 'text-green-400' : 'text-red-400'}`}>
+              {isConnected ? 'Connected' : 'Disconnected'}
+            </span>
+            {!isConnected && (
+              <Button variant="ghost" size="sm" onClick={retryConnection} className="text-xs text-blue-400 hover:text-blue-300">
+                Retry
+              </Button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Connection Error Banner */}
       {connectionError && (
-        <div className="bg-red-900/20 border-b border-red-500/30 p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <WifiOff className="w-4 h-4 text-red-400" />
-              <span className="text-red-400 text-sm">{connectionError}</span>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={retryConnection}
-              className="text-xs text-blue-400 hover:text-blue-300"
-            >
-              Retry Connection
-            </Button>
+        <div className="bg-red-900/20 border-b border-red-500/30 p-3 flex justify-between items-center">
+          <div className="flex items-center space-x-2">
+            <WifiOff className="w-4 h-4 text-red-400" />
+            <span className="text-red-400 text-sm">{connectionError}</span>
           </div>
+          <Button variant="ghost" size="sm" onClick={retryConnection} className="text-xs text-blue-400 hover:text-blue-300">
+            Retry Connection
+          </Button>
         </div>
       )}
 
-
-
-      {/* Messages Container */}
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}
-          >
-            <div
-              className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                message.sender === "user"
-                  ? "bg-gradient-to-r from-blue-600 to-cyan-500 text-white"
-                  : "bg-gradient-to-r from-gray-800 to-gray-700 text-white border border-gray-600"
-              }`}
-            >
-              <div className="flex items-start space-x-2">
-                {message.sender === "bot" && (
-                  <Bot className="w-4 h-4 text-blue-400 mt-1 flex-shrink-0" />
+          <div key={message.id} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}>
+            <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+              message.sender === "user"
+                ? "bg-gradient-to-r from-blue-600 to-cyan-500 text-white"
+                : "bg-gradient-to-r from-gray-800 to-gray-700 text-white border border-gray-600"
+            }`}>
+              <div className="flex flex-col space-y-2">
+                {message.imageUrl && (
+                  <img src={message.imageUrl} alt="Uploaded" className="max-w-xs rounded-lg border border-gray-500" />
                 )}
-                <div className="flex-1">
-                  <p className="text-sm whitespace-pre-wrap">{message.text}</p>
-                  <p className="text-xs opacity-60 mt-1">
-                    {message.timestamp.toLocaleTimeString()}
-                  </p>
-                </div>
-                {message.sender === "user" && (
-                  <User className="w-4 h-4 text-white mt-1 flex-shrink-0" />
+                {message.text && (
+                  <div className="text-sm whitespace-pre-wrap">
+                    {message.sender === "bot" ? renderMarkdown(message.text) : message.text}
+                  </div>
                 )}
+                <p className="text-xs opacity-60 mt-1">{message.timestamp.toLocaleTimeString()}</p>
               </div>
             </div>
           </div>
         ))}
-        
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-gradient-to-r from-gray-800 to-gray-700 text-white rounded-2xl px-4 py-3 border border-gray-600">
-              <div className="flex items-center space-x-2">
-                <Bot className="w-4 h-4 text-blue-400" />
-                <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
-                <span className="text-sm">DE OMNI is thinking...</span>
-              </div>
+            <div className="bg-gradient-to-r from-gray-800 to-gray-700 text-white rounded-2xl px-4 py-3 border border-gray-600 flex items-center space-x-2">
+              <Bot className="w-4 h-4 text-blue-400" />
+              <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+              <span className="text-sm">DE OMNI is thinking...</span>
             </div>
           </div>
         )}
-        
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Container */}
-      <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 backdrop-blur-sm border-t border-blue-400/20 p-4">
+      {/* Input */}
+      <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 backdrop-blur-sm border-t border-blue-400/20 p-4 flex flex-col space-y-2">
+        {/* Photo preview if selected */}
+        {pendingPhotoUrl && (
+          <div className="flex justify-start mb-2">
+            <img src={pendingPhotoUrl} alt="Preview" className="max-w-xs rounded-lg border border-gray-500" />
+          </div>
+        )}
+
         <div className="flex space-x-3">
+          {/* Photo button */}
+          <label
+            htmlFor="photo-upload"
+            className="cursor-pointer bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white rounded-2xl px-4 py-3 flex items-center justify-center"
+          >
+            <CameraIcon className="w-4 h-4" />
+          </label>
+          <input
+            id="photo-upload"
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) {
+                handlePhotoSelect(file)
+                e.target.value = ""
+              }
+            }}
+          />
           <div className="flex-1 relative">
             <textarea
               value={inputMessage}
@@ -323,7 +349,7 @@ export default function ChatPage() {
           </div>
           <Button
             onClick={sendMessage}
-            disabled={!inputMessage.trim() || isLoading || !isConnected}
+            disabled={(!inputMessage.trim() && !pendingPhoto) || isLoading || !isConnected}
             className="bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white rounded-2xl px-4 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Send className="w-4 h-4" />
@@ -331,7 +357,6 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* Sidebar */}
       <Sidebar
         key={sidebarKey}
         isOpen={isSidebarOpen}
@@ -342,4 +367,4 @@ export default function ChatPage() {
       />
     </div>
   )
-} 
+}
