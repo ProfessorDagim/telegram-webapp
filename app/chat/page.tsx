@@ -50,6 +50,24 @@ export default function ChatPage() {
     }
     checkConnection()
     const interval = setInterval(checkConnection, 30000)
+    // register web app user in backend
+    // Register Web App user in backend
+    const registerUser = async () => {
+      try {
+        await fetch(`${appSettings.backendUrl}/register_webapp_user`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: "Anonymous",
+            joined_at: new Date().toISOString()
+          })
+        })
+      } catch (err) {
+        console.error("Failed to register web app user:", err)
+      }
+    }
+    registerUser()
+
     setMessages([
       {
         id: "1",
