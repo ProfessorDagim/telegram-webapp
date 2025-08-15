@@ -67,7 +67,7 @@ export default function ChatPage() {
       }
     }
     registerUser()
-
+//this is what i will delete here
     setMessages([
       {
         id: "1",
